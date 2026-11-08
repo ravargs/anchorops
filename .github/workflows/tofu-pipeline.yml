@@ -1,0 +1,79 @@
+name: OpenTofu Plan & Apply Pipeline
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'stacks/**'
+  push:
+    branches: [ main ]
+    paths:
+      - 'stacks/**'
+
+permissions:
+  id-token: write   # OIDC for AWS authentication
+  contents: read
+  pull-requests: write
+
+jobs:
+  # 1. PLAN on Pull Request
+  plan:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials (OIDC or Secrets)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ap-south-1
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Install OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.8.2
+
+      - name: OpenTofu Init & Plan
+        run: |
+          tofu init
+          # Lockless plan to prevent pipeline stalling
+          tofu plan -lock=false -no-color -out=tfplan
+
+      - name: Comment Plan on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '### ⚓ Anchor IaCM OpenTofu Plan Output\nPlan succeeded! Review the diff before merging.'
+            })
+
+  # 2. APPLY & IMPORT on Merge to Main
+  apply:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ap-south-1
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Install OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.8.2
+
+      - name: OpenTofu Apply (Adopts Cloud Resource into State)
+        run: |
+          tofu init
+          tofu apply -auto-approve
