@@ -1,8 +1,8 @@
 resource "aws_s3_bucket" "secure_bucket" {
-  bucket = "justanothertestbucket"
+  bucket = "justanothertestbucket1232"
 
   tags = {
-    Name        = "justanothertestbucket"
+    Name        = "justanothertestbucket1232"
     Environment = "dev"
     ManagedBy   = "AnchorIaCM"
   }
