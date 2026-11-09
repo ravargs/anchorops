@@ -3,7 +3,7 @@ resource "aws_s3_bucket" "secure_bucket" {
 
   tags = {
     Name        = "test-anchor-s3"
-    Environment = "{{.Environment}}"
+    Environment = "test"
     ManagedBy   = "AnchorIaCM"
   }
 }
